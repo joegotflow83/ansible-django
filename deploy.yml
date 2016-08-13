@@ -1,0 +1,44 @@
+---
+- hosts: webservers
+  vars_files:
+      - vars.yml
+  gather_facts: false
+  become: yes
+
+  handlers:
+      - name: Restart Nginx
+        service: state=restarted name=nginx
+
+      - name: Restart Gunicorn
+        service: state=restarted name=gunicorn
+
+  tasks:
+      - name: Clone/pull Project Repo
+        git: repo={{ project_repo }} dest={{ install_root }}/{{ project_name  }} accept_hostkey=yes
+        notify:
+            - Restart Gunicorn
+
+      - name: Install Python Packages
+        pip: requirements={{ install_root }}/requirements.txt
+        notify:
+            - Restart Gunicorn
+
+      - name: Copy Nginx Config
+        template: src=files/nginx.j2 dest=/etc/nginx/sites-enabled/{{ project_name }}.conf
+        notify:
+            - Restart Nginx
+
+      - name: Django Migrate
+        django_manage: command=migrate app_path={{ install_root }}/{{ project_name }}
+
+      - name: Django Collectstatic
+        django_manage: command=collectstatic app_path={{ instal_root }}/{{ project_name }}
+
+      - name: Copy Gunicorn Config
+        template: src=files/gunicorn.j2 dest=/etc/init/gunicorn.conf
+
+      - name: Ensure Nginx Is Running
+        service: state=started name=nginx
+
+      - name: Ensure Gunicorn Is Running
+        service: state=started name=gunicorn

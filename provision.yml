@@ -1,0 +1,31 @@
+---
+- hosts: webservers
+  vars_files:
+      - vars.yml
+  become: yes
+  handlers:
+      - name: Start Nginx
+        service: state=started name=nginx
+
+      - name: Start Postgres
+        service: state=started name=postgresql
+
+      - name: Start Gunicorn
+        service: state=started name=gunicorn
+  tasks:
+      - name: Update System
+        shell: apt-get update -y
+        become: yes
+
+      - name: Install System Packages
+        apt: pkg={{ item }} update-cache=yes
+        with_items: "{{ system_packages }}"
+        notify:
+            - Start Nginx
+            - Start Postgres
+
+      - name: Create DB
+        become_user: postgres
+        postgresql_user: name={{ db_name }}
+
+- include: deploy.yml
